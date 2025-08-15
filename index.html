@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Timesheet</title>
+  <style>
+    :root{
+      --bg:#f7f9fc;--card:#ffffff;--text:#1f2937;--muted:#6b7280;--line:#e5e7eb;--primary:#2563eb;--primary-500:#3b82f6;--ring:rgba(37,99,235,.35);--success:#10b981;--danger:#ef4444
+    }
+    [data-theme="dark"]{
+      --bg:#0b1220;--card:#0f172a;--text:#e5e7eb;--muted:#94a3b8;--line:#1e293b;--primary:#60a5fa;--primary-500:#93c5fd;--ring:rgba(147,197,253,.35);--success:#34d399;--danger:#f87171
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,Apple Color Emoji,Segoe UI Emoji}
+    .wrap{max-width:860px;margin-inline:auto;padding:20px}
+
+    /* Header */
+    .header{display:flex;align-items:center;gap:14px;justify-content:space-between;margin-bottom:16px}
+    .brand{display:flex;align-items:center;gap:12px}
+    .brand img{max-width:160px;height:auto;display:block}
+    .title h1{font-size:20px;margin:0}
+    .title p{margin:2px 0 0;color:var(--muted);font-size:13px}
+    .toolbar{display:flex;align-items:center;gap:8px}
+    .btn{appearance:none;border:0;border-radius:10px;background:var(--primary);color:#fff;padding:10px 14px;font-weight:600;cursor:pointer;transition:.2s transform,.2s filter}
+    .btn:hover{filter:brightness(.95)}
+    .btn:active{transform:translateY(1px)}
+    .btn.secondary{background:transparent;color:var(--text);border:1px solid var(--line)}
+
+    /* Card */
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.06);padding:18px}
+
+    /* Form */
+    form{display:grid;grid-template-columns:1fr;gap:12px}
+    @media(min-width:640px){form{grid-template-columns:1fr 2fr 1fr auto}} 
+    label{font-weight:600;font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+    input,textarea{width:100%;background:#fff0;border:1px solid var(--line);padding:10px 12px;border-radius:10px;color:var(--text)}
+    textarea{min-height:44px;resize:vertical}
+    input:focus,textarea:focus{outline:2px solid var(--ring);outline-offset:2px;border-color:var(--primary-500)}
+    .field{display:flex;flex-direction:column}
+    .actions{display:flex;gap:10px;align-items:end}
+
+    /* Table */
+    .table-wrap{margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:55vh}
+    table{width:100%;border-collapse:collapse;min-width:540px}
+    thead th{position:sticky;top:0;background:var(--card);z-index:1}
+    th,td{padding:12px 14px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}
+    tbody tr:hover{background:color-mix(in oklab, var(--card) 92%, var(--primary) 8%)}
+
+    /* Footer summary */
+    .summary{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px}
+    .total{font-weight:800}
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-size:12px}
+
+    /* Toast */
+    .toast{position:fixed;inset:auto 16px 16px auto;background:var(--card);border:1px solid var(--line);padding:10px 12px;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,.08);opacity:0;transform:translateY(8px);transition:.25s}
+    .toast.show{opacity:1;transform:translateY(0)}
+
+    /* Theme toggle */
+    .toggle{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--text);cursor:pointer}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- Header / Branding -->
+    <div class="header">
+      <div class="brand">
+        <img id="logo" src="https://i.imgur.com/OkwEum1.png" alt="Logo" />
+        <div class="title">
+          <h1>My Timesheet</h1>
+          <p>OrderMyGear Project</p>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button id="themeBtn" class="toggle" type="button" aria-pressed="false">🌙 Toggle theme</button>
+        <button id="exportBtn" class="btn secondary" type="button">Export CSV</button>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <div class="card">
+      <form id="timesheetForm">
+        <div class="field">
+          <label for="date">Date</label>
+          <input type="date" id="date" required />
+        </div>
+        <div class="field" style="grid-column: span 2">
+          <label for="notes">Notes</label>
+          <textarea id="notes" placeholder="Brief description of work…"></textarea>
+        </div>
+        <div class="field">
+          <label for="hours">Hours</label>
+          <input type="number" id="hours" step="0.25" min="0" placeholder="e.g., 1.5" required />
+        </div>
+        <div class="actions">
+          <button class="btn" type="submit">Add Entry</button>
+        </div>
+      </form>
+
+      <!-- Table -->
+      <div class="table-wrap">
+        <table aria-describedby="summaryText">
+          <thead>
+            <tr>
+              <th style="width: 140px;">Date</th>
+              <th>Notes</th>
+              <th style="width: 120px;">Hours</th>
+            </tr>
+          </thead>
+          <tbody id="entries"></tbody>
+        </table>
+      </div>
+
+      <!-- Summary -->
+      <div class="summary">
+        <div id="summaryText" class="total">Total Hours: <span id="totalHours">0</span></div>
+        <div class="pill" id="countPill">0 entries</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    // ===== CONFIG =====
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbw0T9CWOJSpNiGhDl_QlwH93JW4sf7CwihBXki07dX-_YA793RVMpslvl_uXZuTCoI/exec"; // paste Apps Script Web App URL
+    // ==================
+
+    const form = document.getElementById('timesheetForm');
+    const tbody = document.getElementById('entries');
+    const totalEl = document.getElementById('totalHours');
+    const countPill = document.getElementById('countPill');
+    const toast = document.getElementById('toast');
+    const themeBtn = document.getElementById('themeBtn');
+
+    // Theme toggle (persisted)
+    const savedTheme = localStorage.getItem('ts_theme');
+    if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+    themeBtn.addEventListener('click', ()=>{
+      const current = document.documentElement.getAttribute('data-theme');
+      const next = current === 'dark' ? '' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('ts_theme', next);
+      themeBtn.setAttribute('aria-pressed', String(next==='dark'));
+    });
+
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const date = document.getElementById('date').value;
+      const notes = document.getElementById('notes').value;
+      const hours = document.getElementById('hours').value;
+      try{
+        await postJSON(GAS_URL, {date, notes, hours});
+        form.reset();
+        showToast('Entry added');
+        await loadEntries();
+      }catch(err){
+        console.error(err);
+        showToast('Save failed. Check web app URL/permissions.', true);
+      }
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', exportCSV);
+
+    async function loadEntries(){
+      const res = await fetch(GAS_URL + '?action=get');
+      if(!res.ok) throw new Error('GET failed: '+res.status);
+      const rows = await res.json(); // [[date, notes, hours], ...]
+      tbody.innerHTML='';
+      let total = 0; let count = 0;
+      rows.forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${escapeHtml(r[0])}</td><td>${escapeHtml(r[1]||'')}</td><td>${escapeHtml(r[2])}</td>`;
+        tbody.appendChild(tr);
+        total += parseFloat(r[2]) || 0; count++;
+      });
+      totalEl.textContent = total.toFixed(2).replace(/\.00$/, '');
+      countPill.textContent = `${count} ${count===1?'entry':'entries'}`;
+    }
+
+    async function postJSON(url, payload){
+      const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
+      const data = await res.json().catch(()=>({status:'error'}));
+      if(!res.ok || data.status!=="success") throw new Error(data.message||('HTTP '+res.status));
+      return data;
+    }
+
+    function exportCSV(){
+      // Build CSV from current table rows
+      let csv = 'Date,Notes,Hours\n';
+      [...tbody.querySelectorAll('tr')].forEach(tr=>{
+        const tds = tr.querySelectorAll('td');
+        const row = [tds[0].textContent, tds[1].textContent.replaceAll('"','""'), tds[2].textContent]
+          .map(v=>`"${v}"`).join(',');
+        csv += row + '\n';
+      });
+      const blob = new Blob([csv], {type:'text/csv'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      const d = new Date();
+      const ymd = d.toISOString().slice(0,10);
+      a.download = `timesheet_${ymd}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+
+    function showToast(msg, danger=false){
+      toast.textContent = msg; 
+      toast.style.borderColor = danger ? 'var(--danger)' : 'var(--line)';
+      toast.classList.add('show');
+      setTimeout(()=>toast.classList.remove('show'), 2000);
+    }
+
+    function escapeHtml(s){
+      return String(s==null?'':s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",
+        ">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+
+    // Initial load
+    loadEntries().catch(err=>{
+      console.error(err);
+      showToast('Could not load entries. Check Web App URL.', true);
+    });
+  </script>
+</body>
+</html>
